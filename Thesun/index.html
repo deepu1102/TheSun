@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TheSun | Resume Tracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #ffe4f0;
+      font-family: 'Poppins', sans-serif;
+    }
+    .quote {
+      font-family: "Brush Script MT", cursive;
+      font-size: 1.3rem;
+      color: #ff1493;
+      transition: opacity 1s ease;
+    }
+    .tab-btn {
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .tab-btn.active {
+      border-bottom: 3px solid #ff1493;
+      color: #ff1493;
+    }
+    .progress-bar {
+      height: 10px;
+      border-radius: 9999px;
+      background-color: #ffe4f0;
+      overflow: hidden;
+      margin-top: 5px;
+    }
+    .progress-inner {
+      height: 100%;
+      background-color: #ff1493;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+
+<body class="flex items-center justify-center min-h-screen bg-pink-50">
+
+  <!-- LOGIN PAGE -->
+  <div id="loginPage" class="bg-white shadow-lg rounded-2xl p-8 w-96 text-center">
+    <h2 class="text-3xl font-bold text-pink-500 mb-4">Welcome to TheSun 💖</h2>
+    <p id="quote" class="quote mb-6">"Style your phone, store your vibe."</p>
+
+    <input type="text" id="email" placeholder="Email or Mobile Number"
+           class="w-full border border-gray-300 rounded-lg p-3 mb-3 focus:outline-none focus:ring-2 focus:ring-pink-400" />
+    <input type="password" id="password" placeholder="Password"
+           class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:outline-none focus:ring-2 focus:ring-pink-400" />
+
+    <button id="loginBtn" class="bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 w-full rounded-lg transition-all duration-300">Login</button>
+  </div>
+
+  <!-- DASHBOARD PAGE -->
+  <div id="dashboardPage" class="hidden bg-white shadow-lg rounded-2xl p-8 w-[500px]">
+    <h2 class="text-3xl font-bold text-pink-500 mb-4 text-center">TheSun Dashboard 💼</h2>
+
+    <!-- Tabs -->
+    <div class="flex justify-around mb-6">
+      <button id="homeTab" class="tab-btn active text-gray-700">Home</button>
+      <button id="resumeTab" class="tab-btn text-gray-700">Resume Tracker</button>
+    </div>
+
+    <!-- HOME TAB -->
+    <div id="homeContent">
+      <p class="text-gray-700 mb-6 text-center">Welcome, <b>TheSun User!</b>  
+      Manage your profile, and track your resumes effortlessly 💕</p>
+
+      <button id="logoutBtn" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-semibold transition-all block mx-auto">Logout</button>
+    </div>
+
+    <!-- RESUME TRACKER TAB -->
+    <div id="resumeContent" class="hidden">
+      <h3 class="text-xl font-semibold text-pink-500 mb-3 text-center">Upload Your Resume</h3>
+
+      <input type="file" id="resumeFile" accept=".pdf,.docx"
+             class="border border-gray-300 rounded-lg p-2 w-full mb-4" />
+      <button id="uploadBtn" class="bg-pink-500 hover:bg-pink-600 text-white w-full py-2 rounded-lg font-semibold transition-all">Upload</button>
+
+      <!-- Progress Section -->
+      <div class="mt-5 text-center">
+        <p id="progressText" class="text-gray-700 font-medium mb-2">You have uploaded 0 of 5 resumes.</p>
+        <div class="progress-bar w-full">
+          <div id="progressInner" class="progress-inner w-0"></div>
+        </div>
+      </div>
+
+      <h4 class="text-lg font-semibold mt-6 mb-2 text-gray-700">Uploaded Resumes:</h4>
+      <ul id="resumeList" class="text-gray-600 list-disc list-inside"></ul>
+    </div>
+  </div>
+
+  <script>
+    // 🔹 Rotating Quotes
+    const quotes = [
+      "Style your phone, store your vibe.",
+      "Accessories that make a statement.",
+      "Add sparkle to your mobile life.",
+      "Because your phone deserves the best!",
+      "DeepStored — Where trend meets tech."
+    ];
+    let quoteIndex = 0;
+    const quoteEl = document.getElementById("quote");
+
+    setInterval(() => {
+      quoteIndex = (quoteIndex + 1) % quotes.length;
+      quoteEl.style.opacity = 0;
+      setTimeout(() => {
+        quoteEl.textContent = `"${quotes[quoteIndex]}"`;
+        quoteEl.style.opacity = 1;
+      }, 1000);
+    }, 3000);
+
+    // 🔹 Login
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const loginPage = document.getElementById("loginPage");
+    const dashboardPage = document.getElementById("dashboardPage");
+
+    loginBtn.addEventListener("click", () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+
+      if (email && password) {
+        loginPage.classList.add("hidden");
+        dashboardPage.classList.remove("hidden");
+      } else {
+        alert("Please enter your email/mobile and password!");
+      }
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      dashboardPage.classList.add("hidden");
+      loginPage.classList.remove("hidden");
+    });
+
+    // 🔹 Tabs
+    const homeTab = document.getElementById("homeTab");
+    const resumeTab = document.getElementById("resumeTab");
+    const homeContent = document.getElementById("homeContent");
+    const resumeContent = document.getElementById("resumeContent");
+
+    homeTab.addEventListener("click", () => {
+      homeContent.classList.remove("hidden");
+      resumeContent.classList.add("hidden");
+      homeTab.classList.add("active");
+      resumeTab.classList.remove("active");
+    });
+
+    resumeTab.addEventListener("click", () => {
+      homeContent.classList.add("hidden");
+      resumeContent.classList.remove("hidden");
+      resumeTab.classList.add("active");
+      homeTab.classList.remove("active");
+    });
+
+    // 🔹 Resume Tracker Logic
+    const uploadBtn = document.getElementById("uploadBtn");
+    const resumeFile = document.getElementById("resumeFile");
+    const resumeList = document.getElementById("resumeList");
+    const progressText = document.getElementById("progressText");
+    const progressInner = document.getElementById("progressInner");
+
+    const MAX_RESUMES = 5;
+    let resumes = JSON.parse(localStorage.getItem("resumes") || "[]");
+
+    renderList();
+
+    uploadBtn.addEventListener("click", () => {
+      const file = resumeFile.files[0];
+      if (!file) return alert("Please select a resume file first!");
+      if (resumes.length >= MAX_RESUMES) return alert("You can only upload up to 5 resumes!");
+
+      const resume = {
+        name: file.name,
+        date: new Date().toLocaleString()
+      };
+      resumes.push(resume);
+      localStorage.setItem("resumes", JSON.stringify(resumes));
+      resumeFile.value = "";
+      renderList();
+    });
+
+    function renderList() {
+      resumeList.innerHTML = "";
+      resumes.forEach((r, index) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          ${r.name} <span class="text-sm text-gray-400">(${r.date})</span>
+          <button onclick="deleteResume(${index})" class="text-red-500 ml-2">Delete</button>
+        `;
+        resumeList.appendChild(li);
+      });
+      updateProgress();
+    }
+
+    function updateProgress() {
+      const count = resumes.length;
+      progressText.textContent = `You have uploaded ${count} of ${MAX_RESUMES} resumes.`;
+      progressInner.style.width = `${(count / MAX_RESUMES) * 100}%`;
+    }
+
+    window.deleteResume = function(index) {
+      resumes.splice(index, 1);
+      localStorage.setItem("resumes", JSON.stringify(resumes));
+      renderList();
+    };
+  </script>
+</body>
+</html>

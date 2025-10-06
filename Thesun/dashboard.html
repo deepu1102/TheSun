@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Thesun — Resume Tracker (Dashboard)</title>
+
+  <!-- pdf.js (for PDF text extraction) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
+
+  <!-- mammoth (for docx text extraction) -->
+  <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+
+  <!-- html2pdf for report export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    :root{
+      --pink-strong:#ff4da6;
+      --pink-soft:#ffe6f2;
+      --accent:#ffbedf;
+      --muted:#666;
+      --good:#16a34a;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --white:#fff;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,#fff,#fff6f9);
+      margin:0;padding:24px;color:#222;
+    }
+    .container{max-width:1060px;margin:0 auto}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    header h1{color:var(--pink-strong);margin:0;font-size:22px}
+    header p{color:var(--muted);margin:0;font-size:13px}
+
+    .card{background:var(--white);border-radius:12px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,0.06);margin-bottom:18px}
+
+    .upload-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .file-input{flex:1;padding:10px;border-radius:10px;border:2px dashed var(--accent);background:#fff}
+    .btn{background:var(--pink-strong);color:var(--white);border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn.secondary{background:var(--white);border:1px solid var(--accent);color:var(--pink-strong)}
+    .btn.small{padding:6px 10px;font-size:14px}
+
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:18px}
+    @media(max-width:980px){.grid{grid-template-columns:1fr}}
+
+    .list-table{width:100%;border-collapse:collapse;margin-top:12px}
+    .list-table th,.list-table td{padding:12px;border-bottom:1px solid #f7d6ea;text-align:left}
+    .list-table th{background:var(--pink-strong);color:var(--white);font-weight:700}
+
+    .actions button{margin-right:8px;padding:8px 10px;border-radius:8px;border:none;cursor:pointer}
+    .view-btn{background:#9b4d96;color:white}
+    .download-btn{background:#059669;color:white}
+    .delete-btn{background:#ef4444;color:white}
+    .report-btn{background:#6b21a8;color:white}
+
+    .panel{padding:14px;border-radius:10px;background:linear-gradient(180deg,#fff,#fffafc);border:1px solid #ffe6f8}
+    .field{margin-bottom:10px}
+    label{display:block;font-weight:600;color:var(--muted);margin-bottom:6px}
+    input[type="text"]{width:100%;padding:10px;border-radius:8px;border:1px solid #f0d6e9;background:#fffafa}
+
+    .progress-bar{height:14px;border-radius:999px;background:#f7d6e9;overflow:hidden;margin-top:8px}
+    .progress-fill{height:100%;width:0%;background:var(--pink-strong);transition:width .4s ease, background .2s ease}
+
+    .suggestions{margin-top:12px;background:#fff4fb;padding:10px;border-left:4px solid var(--pink-strong);border-radius:8px}
+    .suggestions ul{margin:8px 0 0 18px;color:#333}
+    .suggestions li{margin-bottom:8px}
+
+    #reportArea{display:none;padding:12px;border-radius:8px;background:#fff0f6;margin-top:12px}
+    .muted{color:var(--muted);font-size:13px}
+    .small{font-size:13px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Thesun • Resume Tracker</h1>
+        <p class="small">Upload a resume, enter a role (optional), get a general ATS score & suggestions.</p>
+      </div>
+      <div>
+        <button id="clearAllBtn" class="btn secondary small">Clear All</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="upload-row">
+        <input id="fileInput" class="file-input" type="file" accept=".pdf,.docx,.txt" />
+        <button id="analyzeAddBtn" class="btn">Analyze & Add</button>
+        <div style="min-width:200px">
+          <input id="roleInput" type="text" placeholder="Optional: target job role (open text)" />
+        </div>
+      </div>
+      <p class="muted" style="margin-top:8px">Tip: use Live Server / localhost. Supported: PDF, DOCX, TXT.</p>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT -->
+      <div>
+        <div class="card">
+          <h3 style="margin:0 0 8px 0;color:var(--pink-strong)">Analyzed Resumes</h3>
+          <table class="list-table" id="resumesTable" role="table">
+            <thead><tr><th>File</th><th style="width:220px">Score</th><th style="width:320px">Actions</th></tr></thead>
+            <tbody id="resumesBody"></tbody>
+          </table>
+          <p id="noResumes" class="muted" style="text-align:center;margin-top:12px">No resumes yet — upload and click <b>Analyze & Add</b>.</p>
+        </div>
+
+        <div id="reportArea" class="card" aria-hidden="true">
+          <h3 style="margin-top:0;color:var(--pink-strong)">ATS Report Preview</h3>
+          <div id="reportContent" class="muted"></div>
+          <div style="margin-top:12px">
+            <button id="savePdfBtn" class="btn">Save Report as PDF</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <aside>
+        <div class="panel">
+          <div class="field">
+            <label for="roleInputRight">Target Job Role (optional)</label>
+            <input id="roleInputRight" type="text" placeholder="e.g. Data Analyst, Frontend Dev" />
+          </div>
+
+          <div class="field">
+            <label>ATS Score</label>
+            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+            <div style="margin-top:8px;font-weight:700;color:var(--muted)"><span id="scoreNumber">0%</span></div>
+          </div>
+
+          <div class="field">
+            <label>Feedback Summary</label>
+            <div id="feedbackSummary" class="muted">No analysis yet.</div>
+          </div>
+
+          <div class="field">
+            <label>Suggestions</label>
+            <div class="suggestions" id="suggestionsBox">
+              <ul id="suggestionsList"><li>Upload a resume and click Analyze & Add to see suggestions.</li></ul>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+    </div>
+  </div>
+
+<script>
+/* Thesun — Dashboard JS
+   Supports PDF/DOCX/TXT extraction, general ATS scoring, suggestions, view/download/delete, PDF report
+*/
+
+const fileInput = document.getElementById('fileInput');
+const analyzeAddBtn = document.getElementById('analyzeAddBtn');
+const roleInput = document.getElementById('roleInput');
+const roleInputRight = document.getElementById('roleInputRight');
+const resumesBody = document.getElementById('resumesBody');
+const noResumes = document.getElementById('noResumes');
+const progressFill = document.getElementById('progressFill');
+const scoreNumber = document.getElementById('scoreNumber');
+const feedbackSummary = document.getElementById('feedbackSummary');
+const suggestionsList = document.getElementById('suggestionsList');
+const reportArea = document.getElementById('reportArea');
+const reportContent = document.getElementById('reportContent');
+const savePdfBtn = document.getElementById('savePdfBtn');
+const clearAllBtn = document.getElementById('clearAllBtn');
+
+let list = []; // items: {id,name,blobUrl,score,suggestions,details}
+
+// Weights
+const SECTION_WEIGHT = 40;
+const KEYWORD_WEIGHT = 35;
+const CONTACT_WEIGHT = 10;
+const LENGTH_WEIGHT = 10;
+const ROLE_WEIGHT = 5;
+
+// Sections & keywords (general)
+const SECTIONS = [
+  {name:'Education', patterns:[/education/i, /\bdegree\b/i, /\bgraduat/i, /\buniversity\b/i, /\bcollege\b/i]},
+  {name:'Skills', patterns:[/\bskills?\b/i, /\btechnical skills\b/i, /\bcompetenc/i]},
+  {name:'Experience', patterns:[/\bexperience(s)?\b/i, /\bwork history\b/i, /\bresponsibilit/i]},
+  {name:'Projects', patterns:[/\bprojects?\b/i, /\bportfolio\b/i, /\bgithub\b/i]},
+  {name:'Contact', patterns:[/\bemail\b/i, /@/, /\bphone\b/i, /\+?\d[\d\s-]{6,}\d/]},
+  {name:'Summary', patterns:[/\bsummary\b/i, /\bprofile\b/i, /\bobjective\b/i]},
+  {name:'Certifications', patterns:[/\bcertificat/i, /\blicen(s|se)\b/i]}
+];
+
+const GENERIC_KEYWORDS = [
+  'communication','leadership','team','project','analysis','data','manage','develop','design','test',
+  'python','sql','excel','javascript','react','aws','azure','docker','kubernetes','ml','machine learning',
+  'statistics','research','marketing','sales','customer'
+];
+
+// Utility: extract text from PDF using pdf.js
+async function extractTextFromPDF(file){
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  let text = '';
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    text += ' ' + content.items.map(i=>i.str).join(' ');
+  }
+  return text.toLowerCase();
+}
+
+// Utility: extract text from docx using mammoth
+async function extractTextFromDocx(file){
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({arrayBuffer});
+  return (result.value || '').toLowerCase();
+}
+
+// Wrapper: extract text from supported files
+async function extractText(file){
+  const name = file.name.toLowerCase();
+  try{
+    if(name.endsWith('.pdf')) return await extractTextFromPDF(file);
+    if(name.endsWith('.docx')) return await extractTextFromDocx(file);
+    if(name.endsWith('.txt')) return await file.text();
+    // fallback: try text
+    return await file.text();
+  } catch(err){
+    console.error('extract error', err);
+    try { return (await file.text()).toLowerCase();} catch(e){ return ''; }
+  }
+}
+
+// Find sections present/missing
+function findSections(text){
+  const found=[], missing=[];
+  for(const s of SECTIONS){
+    const ok = s.patterns.some(re=>re.test(text));
+    if(ok) found.push(s.name); else missing.push(s.name);
+  }
+  return {found,missing};
+}
+
+// Find generic keywords
+function findKeywords(text, candidates){
+  const found=[];
+  for(const k of candidates){
+    const re = new RegExp('\\b' + k.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\$&') + '\\b','i');
+    if(re.test(text)) found.push(k);
+  }
+  return found;
+}
+
+// Derive extra role-related candidates from user input (simple expansion)
+function deriveRoleKeywords(role){
+  if(!role) return [];
+  const raw = role.toLowerCase().replace(/[^\w\s]/g,' ').split(/\s+/).filter(Boolean);
+  const set = new Set();
+  for(const w of raw){
+    set.add(w);
+    if(w.includes('data')) ['data','analysis','sql','python'].forEach(x=>set.add(x));
+    if(w.includes('engineer')) ['development','python','design'].forEach(x=>set.add(x));
+    if(w.includes('front')||w.includes('ui')||w.includes('ux')) ['javascript','react','design'].forEach(x=>set.add(x));
+    if(w.includes('dev')||w.includes('developer')) ['javascript','node','git'].forEach(x=>set.add(x));
+    if(w.includes('manager')) ['leadership','project management','stakeholder'].forEach(x=>set.add(x));
+    if(w.includes('analyst')) ['excel','sql','power bi','tableau'].forEach(x=>set.add(x));
+  }
+  return Array.from(set);
+}
+
+function detectContact(text){
+  const email = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(text);
+  const phone = /(\+?\d{1,3}[\s-]?)?(\(?\d{2,4}\)?[\s-]?)?\d{6,12}/.test(text);
+  return {email, phone};
+}
+
+function computeScore(text, role){
+  const txt = (text||'').toLowerCase();
+  const {found, missing} = findSections(txt);
+  const foundGeneric = findKeywords(txt, GENERIC_KEYWORDS);
+  const roleCandidates = deriveRoleKeywords(role);
+  const foundRole = findKeywords(txt, roleCandidates);
+  const contact = detectContact(txt);
+  const words = (txt.match(/\b[a-z0-9]+\b/gi)||[]).length;
+
+  const sectionRatio = found.length / SECTIONS.length;
+  const sectionScore = sectionRatio * SECTION_WEIGHT;
+
+  const genericRatio = Math.min(foundGeneric.length, GENERIC_KEYWORDS.length) / GENERIC_KEYWORDS.length;
+  const genericScore = genericRatio * KEYWORD_WEIGHT;
+
+  const roleRatio = roleCandidates.length ? Math.min(foundRole.length / roleCandidates.length, 1) : 0;
+  const roleScore = roleRatio * ROLE_WEIGHT;
+
+  const contactScore = (contact.email || contact.phone) ? CONTACT_WEIGHT : 0;
+
+  const lengthRatio = Math.min(words / 350, 1);
+  const lengthScore = lengthRatio * LENGTH_WEIGHT;
+
+  const total = Math.round(sectionScore + genericScore + roleScore + contactScore + lengthScore);
+
+  const suggestions = [];
+  if(missing.length) suggestions.push('Missing sections: ' + missing.join(', '));
+  const missingGeneric = GENERIC_KEYWORDS.filter(k=>!foundGeneric.includes(k)).slice(0,6);
+  if(missingGeneric.length) suggestions.push('Consider adding skills/keywords: ' + missingGeneric.join(', '));
+  if(roleCandidates.length){
+    const missingRole = roleCandidates.filter(k=>!foundRole.includes(k)).slice(0,8);
+    if(missingRole.length) suggestions.push('To target "'+role+'", add: ' + missingRole.join(', '));
+  }
+  if(!contact.email && !contact.phone) suggestions.push('Add contact info (email & phone).');
+  if(words < 250) suggestions.push('Add more detail and measurable results (aim 300–700 words).');
+
+  const details = {foundSections:found, missingSections:missing, foundGenericKeywords:foundGeneric, foundRoleKeywords:foundRole, contact, words};
+
+  return {score: Math.max(0, Math.min(100, total)), suggestions, details};
+}
+
+// UI: render list of analyzed resumes
+function renderList(){
+  resumesBody.innerHTML = '';
+  if(list.length === 0){
+    noResumes.style.display = 'block';
+    reportArea.style.display = 'none';
+    progressFill.style.width = '0%';
+    scoreNumber.textContent = '0%';
+    feedbackSummary.textContent = 'No analysis yet.';
+    suggestionsList.innerHTML = '<li>Upload a resume and click Analyze & Add.</li>';
+    return;
+  }
+  noResumes.style.display = 'none';
+
+  for(const item of list){
+    const tr = document.createElement('tr');
+    const tdName = document.createElement('td'); tdName.textContent = item.name; tr.appendChild(tdName);
+
+    const tdScore = document.createElement('td');
+    const bar = document.createElement('div'); bar.style.width='140px'; bar.style.background='#f8e7ef'; bar.style.borderRadius='999px'; bar.style.padding='4px';
+    const fill = document.createElement('div'); fill.style.width=item.score+'%'; fill.style.height='14px'; fill.style.borderRadius='999px';
+    fill.style.background = item.score>=80? 'var(--good)' : item.score>=60? 'var(--warn)' : 'var(--bad)';
+    bar.appendChild(fill);
+    const pct = document.createElement('div'); pct.textContent = item.score + '%'; pct.style.marginTop='6px'; pct.style.fontWeight='700';
+    tdScore.appendChild(bar); tdScore.appendChild(pct); tr.appendChild(tdScore);
+
+    const tdActions = document.createElement('td');
+    tdActions.className = 'actions';
+    const view = document.createElement('button'); view.className='view-btn'; view.textContent='View';
+    view.onclick = ()=> window.open(item.blobUrl,'_blank');
+    const down = document.createElement('button'); down.className='download-btn'; down.textContent='Download';
+    down.onclick = ()=> { const a=document.createElement('a'); a.href=item.blobUrl; a.download=item.name; a.click(); }
+    const del = document.createElement('button'); del.className='delete-btn'; del.textContent='Delete';
+    del.onclick = ()=> { if(confirm('Delete this resume?')){ URL.revokeObjectURL(item.blobUrl); list = list.filter(x=>x.id!==item.id); renderList(); } };
+    const rep = document.createElement('button'); rep.className='report-btn'; rep.textContent='Report';
+    rep.onclick = ()=> showReport(item);
+
+    tdActions.appendChild(view); tdActions.appendChild(down); tdActions.appendChild(del); tdActions.appendChild(rep);
+    tr.appendChild(tdActions);
+
+    resumesBody.appendChild(tr);
+  }
+}
+
+// show report details in right panel and report area
+function showReport(item){
+  progressFill.style.width = item.score + '%';
+  progressFill.style.background = item.score>=80? 'var(--good)': item.score>=60? 'var(--warn)': 'var(--bad)';
+  scoreNumber.textContent = item.score + '%';
+  feedbackSummary.textContent = item.suggestions.length ? item.suggestions[0] : (item.score>=80 ? 'Great — well optimized' : 'Improve keywords and sections');
+
+  suggestionsList.innerHTML = '';
+  for(const s of item.suggestions){
+    const li = document.createElement('li'); li.textContent = s; suggestionsList.appendChild(li);
+  }
+
+  reportContent.innerHTML = `<strong>${item.name}</strong><br>
+    <b>Score:</b> ${item.score}% <br>
+    <b>Words:</b> ${item.details.words} <br>
+    <b>Found Sections:</b> ${item.details.foundSections.join(', ') || '—'} <br>
+    <b>Found Keywords:</b> ${(item.details.foundGenericKeywords.concat(item.details.foundRoleKeywords)).slice(0,20).join(', ') || '—'}<br>
+    <hr><b>Suggestions:</b><ul>${item.suggestions.map(x=>'<li>'+x+'</li>').join('')}</ul>`;
+
+  reportArea.style.display = 'block';
+  reportArea.setAttribute('aria-hidden','false');
+}
+
+// Main handler: analyze and add
+analyzeAddBtn.addEventListener('click', async ()=>{
+  const file = fileInput.files[0];
+  if(!file){ alert('Please select a PDF / DOCX / TXT file first.'); return; }
+  analyzeAddBtn.disabled = true; analyzeAddBtn.textContent = 'Analyzing...';
+
+  try{
+    const text = await extractText(file);
+    if(!text || text.length < 30){ alert('Could not extract readable text. Try another file.'); return; }
+
+    const role = (roleInput.value || roleInputRight.value || '').trim();
+    const result = computeScore(text, role);
+
+    const blobUrl = URL.createObjectURL(file);
+    const entry = { id: Date.now()+Math.random(), name:file.name, blobUrl, score:result.score, suggestions:result.suggestions, details: result.details };
+    list.unshift(entry);
+
+    // sync role inputs
+    roleInputRight.value = roleInput.value;
+
+    renderList();
+    showReport(entry);
+  } catch(err){
+    console.error(err);
+    alert('Error analyzing file: ' + (err.message || err));
+  } finally {
+    analyzeAddBtn.disabled = false; analyzeAddBtn.textContent = 'Analyze & Add';
+    fileInput.value = '';
+  }
+});
+
+// Save report as PDF (reportContent element)
+savePdfBtn.addEventListener('click', ()=>{
+  if(!reportContent.innerHTML) return alert('No report to save. Click Report on a resume first.');
+  const opt = { margin:0.5, filename:'Thesun_ATS_Report.pdf', html2canvas:{scale:1.5}, jsPDF:{unit:'in',format:'a4',orientation:'portrait'} };
+  html2pdf().from(reportContent).set(opt).save();
+});
+
+// Clear all
+clearAllBtn.addEventListener('click', ()=>{
+  if(!confirm('Clear all analyzed resumes?')) return;
+  list.forEach(i=>URL.revokeObjectURL(i.blobUrl));
+  list = [];
+  renderList();
+  reportArea.style.display = 'none';
+});
+
+// initial render
+renderList();
+</script>
+</body>
+</html>
